@@ -9,7 +9,7 @@ printValFrac <- function(numerator, denominator) {
 
 #Make density distribution with 95% poisson CL and weights
 #TODO: wrapper
-plotDensity() <- function(x, y) {
+plotDensity <- function(x, y) {
     
 }
 
@@ -150,7 +150,7 @@ filterData <- function(inputCSVFile='data/MergedData_DecomNov18.csv', outputCSVF
     return(mergedData)
 }
 
-analyze(inputCSVFile='data/MergedData_DecomNov18.csv') {
+analyze <- function(inputCSVFile='data/MergedData_DecomNov18.csv') {
     #Filter data first
     mergedData <<- filterData(inputCSVFile)
 
