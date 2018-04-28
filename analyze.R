@@ -162,6 +162,7 @@ filterData <- function(inputCSVFile='data/MergedData_DecomNov18.csv', outputCSVF
 analyze <- function(inputCSVFile='data/MergedData_DecomNov18.csv') {
     #Filter data first
     mergedData <<- filterData(inputCSVFile, '', FALSE)
+    nEntries <<- nrow(mergedData)
 
     # Simple density distributions
     ## Year
