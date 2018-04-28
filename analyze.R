@@ -4,7 +4,7 @@
 
 #Utility function that return a string for pinting value and fraction
 printValFrac <- function(numerator, denominator) {
-    return(paste0(numerator, ' / ', denominator, ' (', numerator / denominator * 100, '%)'))
+    return(paste0(numerator, ' / ', denominator, ' (', signif(numerator / denominator * 100, digits=2), '%)'))
 }
 
 #Make density distribution with 95% poisson CL and weights
@@ -20,6 +20,10 @@ filterData <- function(inputCSVFile='data/MergedData_DecomNov18.csv', outputCSVF
     print(paste('Total entries: ', nEntries))
 
     # Check validity of data
+    ## Fix Shift (1 invalid shift, all fieds are also empty -> will discard)
+    isInvalidShift <- unlist(lapply(rawMergedData$Shift, is.na))
+    print(paste('Number of invalid-shift cards:', printValFrac(nrow(rawMergedData[isInvalidShift,]), nEntries)))
+
     ## Fix Lane
     rawMergedData[rawMergedData$Lane == 'G','Lane'] <- 'g'
     rawMergedData$Lane <- as.character(rawMergedData$Lane)
@@ -33,13 +37,13 @@ filterData <- function(inputCSVFile='data/MergedData_DecomNov18.csv', outputCSVF
     VetoSkipValues <- factor(rawMergedData$Veto)
     isSkip <- (rawMergedData[,'Veto'] %in% c('s', 'S'))
     nSkips <- nrow(rawMergedData[isSkip,])
-    print(paste('Number of skips: ', nSkips, '(', nSkips / nEntries * 100, '%)'))
+    print(paste('Number of skips: ', printValFrac(nSkips, nEntries)))
 
     isVeto <- (rawMergedData[,'Veto'] %in% c('a', 'A', 'c', 'C'))
     isChildVeto <- (rawMergedData[,'Veto'] %in% c('c', 'C'))
     nVetos = nrow(rawMergedData[isVeto,])
     nChildVetos = nrow(rawMergedData[isChildVeto,])
-    print(paste('Vetos: ', nVetos, '(', nVetos / nEntries * 100, '%), out of which child-veto: ', nChildVetos, '(', nChildVetos / nVetos * 100, '%)'))
+    print(paste('Vetos: ', printValFrac(nVetos, nEntries), ', out of which child-veto: ', printValFrac(nChildVetos, nVetos)))
     if (makePlots) {
         x11()
         with(rawMergedData[isVeto,], hist(Shift,main='Number of Vetos vs Shift')) #plot vetos per shift
@@ -118,19 +122,22 @@ filterData <- function(inputCSVFile='data/MergedData_DecomNov18.csv', outputCSVF
     
 
     #Finally filter out any of the above we don't want,
-    #set column types
+    mergedData <- rawMergedData[!isSkip & !isVeto & !isInvalidShift,]
+    #set column types    
+    ### mergedData$Shift <- as.factor(mergedData$Shift)    
+    ### mergedData$X2a <- as.integer(mergedData$X2a)
+    ### mergedData$X3 <- as.integer(mergedData$X3)
+    ### mergedData$X4 <- as.integer(mergedData$X4)
+    ### mergedData$X5a <- as.integer(mergedData$X5a)    
+    ### mergedData$X5b <- as.integer(mergedData$X5b)
     #add the necessary variables,
-    mergedData <- rawMergedData[!isSkip & !isVeto,]
-    # mergedData$Shift <- as.factor(mergedData$Shift)    
-    # mergedData$X2a <- as.integer(mergedData$X2a)
-    # mergedData$X3 <- as.integer(mergedData$X3)
-    # mergedData$X4 <- as.integer(mergedData$X4)
-    # mergedData$X5a <- as.integer(mergedData$X5a)    
-    #mergedData$X5b <- as.integer(mergedData$X5b)
-    weightVetos = vetoFractions / sum(vetoFractions)
+    # weight for each entry to compensate vetos
+    #  N/(N-V) = 1./(1-V/N) = 1./(1-vetoFraction)    
+    weightVecVetos = 1.0 / (1.0 - vetoFractions)
     mergedData = within(mergedData, {
-        weightVetos = ifelse(Shift == 2, weightVetos[1], ifelse(Shift == 5, weightVetos[2], ifelse(Shift == 8, weightVetos[3], 1.0)))
+        weightVetos = ifelse(Shift == 2, weightVecVetos[1], ifelse(Shift == 5, weightVecVetos[2], ifelse(Shift == 8, weightVecVetos[3], 1.0)))
     })
+    
     nFinalEntries = nrow(mergedData)
     print(paste('Total number of output entries:', printValFrac(nFinalEntries, nEntries)))
     print(paste(' # non-fatal Invalid entries for X1: ', printValFrac(nrow(mergedData[mergedData$X1 == 0,]), nFinalEntries)))
@@ -141,6 +148,8 @@ filterData <- function(inputCSVFile='data/MergedData_DecomNov18.csv', outputCSVF
     print(paste(' # non-fatal Invalid entries for X5a: ', printValFrac(nrow(mergedData[mergedData$X5a == 0,]), nFinalEntries)))
     print(paste(' # non-fatal Invalid entries for X5b: ', printValFrac(nrow(mergedData[mergedData$X5b == 0,]), nFinalEntries)))
     print(paste(' #non-fatal Invalid entries for X5b (for X5a==1,2): ', printValFrac(nrow(mergedData[(mergedData$X5b == 0) & (mergedData$X5a %in% c(1,2)),]), nrow(mergedData[(mergedData$X5a %in% c(1,2)),]))))
+    print("Weights stored into 'weightVeto' to compensate vetos per-shift (1=2-5PM, 2=5-8PM, 3=8-11PM):")
+    print(weightVecVetos)
 
     #if not empty, write to CSV file
     if (outputCSVFile != '') {
@@ -152,7 +161,7 @@ filterData <- function(inputCSVFile='data/MergedData_DecomNov18.csv', outputCSVF
 
 analyze <- function(inputCSVFile='data/MergedData_DecomNov18.csv') {
     #Filter data first
-    mergedData <<- filterData(inputCSVFile)
+    mergedData <<- filterData(inputCSVFile, '', FALSE)
 
     # Simple density distributions
     ## Year
