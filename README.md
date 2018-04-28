@@ -1,4 +1,5 @@
 # Analysis of Burning Man Census Decompression data.
+# Gridge & Picky, 2018
 
 analyse.R provides the needed routines.
  filterData <- filters input merged CSV data
