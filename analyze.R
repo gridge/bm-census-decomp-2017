@@ -166,11 +166,12 @@ analyze <- function(inputCSVFile='data/MergedData_DecomNov18.csv') {
     nEntries <<- nrow(mergedData)
 
     # Simple frequency/density distributions with weighted entries
-    ## Year, clearly spurious data with year==0
+    ## Year, clearly spurious data with year==0; translated in age
     x11()
-    ggplot(mergedData, aes(x=ifelse(X1==-1,-1,ifelse(X1>18,18+100-X1,18-X1)),y=..density..,weight=weightVetos)) + geom <- histogram(binwidth=10)
+    currentYear <- 17
+    ggplot(mergedData, aes(x=ifelse(X1==-1,-1,ifelse(X1>currentYear,currentYear+100-X1,currentYear-X1)),y=..density..,weight=weightVetos)) + geom_histogram(binwidth=10)
     # alternative version with fraction within bin rather than density / year as above
-    ggplot(mergedData, aes(x=ifelse(X1==-1,-1,ifelse(X1>18,18+100-X1,18-X1)),weight=weightVetos/nEntries)) + geom <- histogram(binwidth=10)
+    ggplot(mergedData, aes(x=ifelse(X1==-1,-1,ifelse(X1>currentYear,currentYear+100-X1,currentYear-X1)),weight=weightVetos/nEntries)) + geom_histogram(binwidth=10)
     
     ## Location
 
