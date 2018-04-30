@@ -2,6 +2,8 @@
 # BM Census 2018
 # Gridge
 
+library(ggplot2)
+
 #Utility function that return a string for pinting value and fraction
 printValFrac <- function(numerator, denominator) {
     return(paste0(numerator, ' / ', denominator, ' (', signif(numerator / denominator * 100, digits=2), '%)'))
@@ -59,11 +61,10 @@ filterData <- function(inputCSVFile='data/MergedData_DecomNov18.csv', outputCSVF
     rawMergedData[rawMergedData$Veto == "", 'Veto'] <- 0 #Assign 0 to empty cells
     rawMergedData[rawMergedData$Veto == " ", 'Veto'] <- 0 #Assign 0 to empty cells    
 
+    #Correct X1
     isValidX1 <- unlist(lapply(rawMergedData$X1, is.numeric))
     nInvalidX1 <- nrow(rawMergedData[!isValidX1,])    
-    print(paste('Number of invalid year of birth  (not numeric): ', nInvalidX1))
-
-    #Correct X1
+    print(paste('Number of invalid year of birth  (not numeric): ', nInvalidX1))    
     rawMergedData[is.na(rawMergedData$X1), 'X1'] = -1
     rawMergedData[rawMergedData$X1 == 1996, 'X1'] = 96  
     
@@ -164,9 +165,13 @@ analyze <- function(inputCSVFile='data/MergedData_DecomNov18.csv') {
     mergedData <<- filterData(inputCSVFile, '', FALSE)
     nEntries <<- nrow(mergedData)
 
-    # Simple density distributions
-    ## Year
-
+    # Simple frequency/density distributions with weighted entries
+    ## Year, clearly spurious data with year==0
+    x11()
+    ggplot(mergedData, aes(x=ifelse(X1==-1,-1,ifelse(X1>18,18+100-X1,18-X1)),y=..density..,weight=weightVetos)) + geom <- histogram(binwidth=10)
+    # alternative version with fraction within bin rather than density / year as above
+    ggplot(mergedData, aes(x=ifelse(X1==-1,-1,ifelse(X1>18,18+100-X1,18-X1)),weight=weightVetos/nEntries)) + geom <- histogram(binwidth=10)
+    
     ## Location
 
     ## ...
