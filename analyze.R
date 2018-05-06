@@ -7,6 +7,9 @@ library(lattice)
 library(plyr)
 library(Rmisc)
 library(data.table)
+library(ggmap)
+library(ggalt)
+
 
 #Utility function that return a string for pinting value and fraction
 printValFrac <- function(numerator, denominator) {
@@ -75,8 +78,10 @@ filterData <- function(inputCSVFile='data/MergedData_DecomNov18.csv', outputCSVF
     rawMergedData[rawMergedData$X2a == '3,4', 'X2a'] = 3
     rawMergedData[rawMergedData$X2a == '12', 'X2a'] = 2
     rawMergedData[rawMergedData$X2a == '23', 'X2a'] = 2
-    rawMergedData[(rawMergedData$X2a %in% c('', '.')), 'X2a'] = NA
-    rawMergedData$X2a <- suppressWarnings(as.numeric(as.character(rawMergedData$X2a)))
+    rawMergedData[(rawMergedData$X2a %in% c('', '.')), 'X2a'] = '<NA>'
+    #rawMergedData$X2a <- suppressWarnings(as.numeric(as.character(rawMergedData$X2a)))
+    rawMergedData$X2a <- factor(rawMergedData$X2a,exclude=NULL)
+    addNA(rawMergedData$X2a)
 
     #Correct X2b, fixing different spellings as well
     rawMergedData$X2b <- as.character(rawMergedData$X2b)
@@ -127,21 +132,17 @@ filterData <- function(inputCSVFile='data/MergedData_DecomNov18.csv', outputCSVF
 
     #Finally filter out any of the above we don't want,
     mergedData <- rawMergedData[!isSkip & !isVeto & !isInvalidShift,]
-    #set column types    
-    ### mergedData$Shift <- as.factor(mergedData$Shift)    
-    ### mergedData$X2a <- as.integer(mergedData$X2a)
-    ### mergedData$X3 <- as.integer(mergedData$X3)
-    ### mergedData$X4 <- as.integer(mergedData$X4)
-    ### mergedData$X5a <- as.integer(mergedData$X5a)    
-    ### mergedData$X5b <- as.integer(mergedData$X5b)
     #add the necessary variables,
-    # weight for each entry to compensate vetos
-    #  N/(N-V) = 1./(1-V/N) = 1./(1-vetoFraction)    
+    ## weight for each entry to compensate vetos
+    ##  N/(N-V) = 1./(1-V/N) = 1./(1-vetoFraction)    
     weightVecVetos = 1.0 / (1.0 - vetoFractions)
+    ## Year, translated in age
+    currentYear <- 17
     mergedData = within(mergedData, {
         weightVetos = ifelse(Shift == 2, weightVecVetos[1], ifelse(Shift == 5, weightVecVetos[2], ifelse(Shift == 8, weightVecVetos[3], 1.0)))
+        Age <- ifelse(is.na(X1),-1,ifelse(X1>currentYear,currentYear+100-X1,currentYear-X1))  
     })
-    
+
     nFinalEntries = nrow(mergedData)
     print(paste('Total number of output entries:', printValFrac(nFinalEntries, nEntries)))
     print(paste(' # non-fatal Invalid entries for X1: ', printValFrac(nrow(mergedData[is.na(mergedData$X1),]), nFinalEntries)))
@@ -169,20 +170,76 @@ analyze <- function(inputCSVFile='data/MergedData_DecomNov18.csv') {
     mergedData <<- filterData(inputCSVFile, '', FALSE)
     nEntries <<- nrow(mergedData)
 
-    # Simple frequency/density distributions with weighted entries
-    ## Year, clearly spurious data with year==0; translated in age
+    #Common plot style
+    colorScheme = c("#EA008B","#CC308D","#AE608E","#909090")
+    themeSetting <- theme(panel.grid.major = element_blank(),
+                          panel.grid.minor.y = element_line(color="#666464", size = .1),
+                          panel.background  = element_blank(), axis.line.x = element_line(color="Black", size=.75),
+                          title = element_text (size = 15), legend.key = element_blank(),
+                          axis.line.y = element_line(color="Black", size=.75),
+                          axis.title.y = element_text(face = "bold", margin = margin(0,20,0,0), size = 14),
+                          axis.title.x = element_text(face = "bold", margin = margin(20,0,0,0), size = 14),
+                          axis.text = element_text(size = 13), plot.title = element_text(face = "bold", hjust = 0.5))
+    colorSetting <- scale_color_manual(values=colorscheme)
+    fillSetting <- scale_fill_manual(values=colorscheme)
+    
+    # Example plot to show effect of weightVetos
     #x11()
-    currentYear <- 17
-    mergedData <<- within(mergedData, {
-      Age <- ifelse(X1==-1,-1,ifelse(X1>currentYear,currentYear+100-X1,currentYear-X1))
-    })
-    ggplot() + 
-        geom_histogram(binwidth=10, fill='red', alpha=0.5, data=mergedData, aes(x=Age,weight=1./nEntries)) +
-        geom_histogram(binwidth=10, alpha=0.5,fill='blue', data=mergedData, aes(x=Age,weight=weightVetos/sum(weightVetos)))
+    plotYearWeight <- ggplot() + themeSetting + 
+      geom_bar(fill='red', alpha=0.5, data=mergedData, aes(x=Age)) +
+      geom_bar(fill='blue', alpha=0.5, data=mergedData, aes(x=Age,weight=weightVetos)) +  
+      #scale_fill_manual(name='Method', 
+      #                  labels=c('Weighted','Unweighted'), 
+      #                  values=c("h1"="blue","h2"="red")) +
+      theme(legend.position="none") +
+      labs(title='Age (Weighted vs Unweighted)',x="Year", y="Count") +
+      geom_text(aes(label='Unweighted',x=50, y=50,colour='red'),show.legend = TRUE) +
+      geom_text(aes(label='Weighted',x=50, y=43,colour='blue'))
+    #geom_errorbar(aes(x=Age, weight=weightVetos, y=..count.., ymin=..count.. - 5, ymax=..count.. + 5))
+    #geom_histogram(binwidth=10, fill='red', alpha=0.5, data=mergedData, aes(x=Age,weight=1./nEntries)) +
+    #geom_histogram(binwidth=10, alpha=0.5,fill='blue', data=mergedData, aes(x=Age,weight=weightVetos/sum(weightVetos)))
+    
+    # Simple frequency/density distributions with weighted entries
+    #x11()
+    summAge <- summary(mergedData[mergedData$Age >= 0,'Age'])
+    plotYear <- ggplot() + themeSetting + 
+        geom_bar(fill=colorScheme[1], data=mergedData, aes(x=Age,weight=100*weightVetos/sum(weightVetos))) +  
+        labs(title='Age of population',x="Age (years)", y="Percentage (%)") +
+        annotate("text",x=45,y=6,label=paste('Median:',summAge[3]),size=7) +
+        annotate('text',x=45,y=5,label='(only valid entries)',size=3)
+      #geom_errorbar(aes(x=Age, weight=weightVetos, y=..count.., ymin=..count.. - 5, ymax=..count.. + 5))
+      #geom_histogram(binwidth=10, alpha=0.5,fill='blue', data=mergedData, aes(x=Age,weight=weightVetos/sum(weightVetos)))
     
     ## Location
+    plotResidenceSumm <- ggplot(data=mergedData,mapping = aes(x=X2a,weight=weightVetos/sum(weightVetos))) + themeSetting + 
+      geom_bar(fill=colorScheme[1]) +
+      labs(title='Residence',x='',y='Precentage') +
+      scale_x_discrete(breaks = c(1:4,"<NA>"), labels=c("San Francisco","CA (not SF)","Other US","Outside US", "N/A")) +
+      scale_y_continuous(labels=scales::percent) +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
+      coord_flip() +
+      geom_text(stat='count', aes(label=scales::percent(..count..)), hjust=1.0, vjust=0.2)
 
+    summResidence <- count(df=mergedData,vars=c('X2b'),wt_var = c('weightVetos/sum(weightVetos)'))
+    summResidence <- summResidence[order(summResidence$freq,decreasing = TRUE),]
+    summResidence$X2b <- factor(summResidence$X2b, levels=summResidence$X2b,exclude=NULL)
+    levels(summResidence$X2b) <- sub("^$","N/A",summResidence$X2b)
+    plotResidence <- ggplot(data=summResidence[summResidence$freq > 0.01,], aes(x=X2b,y=freq)) + 
+      themeSetting + 
+      geom_bar(stat="identity", fill=colorScheme[1]) +
+      labs(title='Residence',x='',y='Precentage') +
+      scale_y_continuous(labels=scales::percent) +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+    #TODO: add "other" bin to sum up the rest
+  
+    #Heat map of location
+    #summResidence$location <- geocode(summResidence$X2b)
+    
     ## ...
 
     # Correlations
+    
+    
+    # Draw requested plot
+    plotResidence
 }
