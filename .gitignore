@@ -1,6 +1,6 @@
-"2017 Decompression Random Sample Form.pdf"
-"SF Decom Report.jpg"
-"SF Decompression 2018 Analysis.odt"
+*.pdf
+*.jpg
+*.odt
 *~
 data/
 .Rproj.user
