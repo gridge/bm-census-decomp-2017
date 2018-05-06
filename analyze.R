@@ -3,6 +3,10 @@
 # Gridge
 
 library(ggplot2)
+library(lattice)
+library(plyr)
+library(Rmisc)
+library(data.table)
 
 #Utility function that return a string for pinting value and fraction
 printValFrac <- function(numerator, denominator) {
@@ -17,7 +21,8 @@ plotDensity <- function(x, y) {
 
 filterData <- function(inputCSVFile='data/MergedData_DecomNov18.csv', outputCSVFile='',makePlots=TRUE) {
 
-    rawMergedData <<- read.csv(inputCSVFile, header=TRUE)
+    #read input data and publish as global (changes below won't affect its global value! use return value instead)
+    rawMergedData <<- read.csv(inputCSVFile, header=TRUE) #fread(inputCSVFile, header=TRUE, data.table=FALSE)
     nEntries = nrow(rawMergedData)
     print(paste('Total entries: ', nEntries))
 
@@ -58,30 +63,29 @@ filterData <- function(inputCSVFile='data/MergedData_DecomNov18.csv', outputCSVF
         x11()
         plot(vetoFractions, xlab='Shifts',ylab='Density',main='Fraction of Vetos per Shift',sub='1=2-5PM, 2=5-8PM, 3=8-11PM')
     }
-    rawMergedData[rawMergedData$Veto == "", 'Veto'] <- 0 #Assign 0 to empty cells
-    rawMergedData[rawMergedData$Veto == " ", 'Veto'] <- 0 #Assign 0 to empty cells    
+    rawMergedData[rawMergedData$Veto %in% c("",'.'), 'Veto'] <- 0 #Assign 0 to empty cells
+    rawMergedData[is.na(rawMergedData$Veto), 'Veto'] <- 0 #Assign 0 to empty cells
 
     #Correct X1
-    isValidX1 <- unlist(lapply(rawMergedData$X1, is.numeric))
-    nInvalidX1 <- nrow(rawMergedData[!isValidX1,])    
-    print(paste('Number of invalid year of birth  (not numeric): ', nInvalidX1))    
-    rawMergedData[is.na(rawMergedData$X1), 'X1'] = -1
-    rawMergedData[rawMergedData$X1 == 1996, 'X1'] = 96  
+    rawMergedData$X1 <- suppressWarnings(as.numeric(as.character(rawMergedData$X1)))
+    rawMergedData[(!is.na(rawMergedData$X1)) & (rawMergedData$X1 == 1996), 'X1'] = 96
     
     #Correct X2a
     rawMergedData$X2a <- as.character(rawMergedData$X2a)
     rawMergedData[rawMergedData$X2a == '3,4', 'X2a'] = 3
     rawMergedData[rawMergedData$X2a == '12', 'X2a'] = 2
     rawMergedData[rawMergedData$X2a == '23', 'X2a'] = 2
-    rawMergedData[is.na(rawMergedData$X2a), 'X2a'] = 0
-    rawMergedData[rawMergedData$X2a == '', 'X2a'] = 0
-    rawMergedData$X2a <- as.factor(rawMergedData$X2a)    
+    rawMergedData[(rawMergedData$X2a %in% c('', '.')), 'X2a'] = NA
+    rawMergedData$X2a <- suppressWarnings(as.numeric(as.character(rawMergedData$X2a)))
 
     #Correct X2b, fixing different spellings as well
     rawMergedData$X2b <- as.character(rawMergedData$X2b)
-    rawMergedData[rawMergedData$X2a == '1', 'X2b'] = 'San Francisco'
+    rawMergedData[!is.na(rawMergedData$X2a) & (rawMergedData$X2a == 1), 'X2b'] = 'San Francisco'
     rawMergedData[rawMergedData$X2b == '2', 'X2b'] = ''
+    rawMergedData[rawMergedData$X2b == '1', 'X2b'] = ''
     rawMergedData[rawMergedData$X2b == '0', 'X2b'] = ''
+    rawMergedData[rawMergedData$X2b == '.', 'X2b'] = ''
+    rawMergedData[is.na(rawMergedData$X2b), 'X2b'] = ''
     rawMergedData[rawMergedData$X2b == 'La Grange, CA', 'X2b'] = 'La Grange'
     rawMergedData[rawMergedData$X2b == 'Stockton, CA', 'X2b'] = 'Stockton'
     rawMergedData[rawMergedData$X2b == 'San_Marcos', 'X2b'] = 'San Marcos'
@@ -103,24 +107,23 @@ filterData <- function(inputCSVFile='data/MergedData_DecomNov18.csv', outputCSVF
     rawMergedData[rawMergedData$X2b == 'San_Rafael', 'X2b'] = 'San Rafael'
     rawMergedData$X2b <- as.factor(rawMergedData$X2b)        
 
-    #Correct X3,4: Assign 0 to NAs
-    rawMergedData[is.na(rawMergedData$X3), 'X3'] = 0
-    rawMergedData[is.na(rawMergedData$X4), 'X4'] = 0        
+    #Correct X3,4
+    rawMergedData$X3 <- suppressWarnings(as.numeric(as.character(rawMergedData$X3)))
+    rawMergedData$X4 <- suppressWarnings(as.numeric(as.character(rawMergedData$X4)))
+    
 
     #Correct X5a
     spuriousX5a12 <- (rawMergedData[,'X5a'] == 12 & !is.na(rawMergedData[,'X5a']))
     rawMergedData[spuriousX5a12, 'X5a'] = 1
     spuriousX5a23 <- (rawMergedData[,'X5a'] == 23 & !is.na(rawMergedData[,'X5a']))
     rawMergedData[spuriousX5a23, 'X5a'] = 3
-    rawMergedData[is.na(rawMergedData$X5a), 'X5a'] = 0
     rawMergedData[rawMergedData$X5a == 5, 'X5a'] = 1
+    rawMergedData$X5a <- suppressWarnings(as.numeric(as.character(rawMergedData$X5a)))
 
     #Correct X5b, based on answers to X5a
-    rawMergedData[rawMergedData$X5b == 'No','X5b'] = 0
-    rawMergedData[rawMergedData$X5b == 'Friends','X5b'] = 0
-    rawMergedData[rawMergedData$X5b == 'N/A','X5b'] = 0
-    rawMergedData[rawMergedData$X5b == '','X5b'] = 0 
-    
+    rawMergedData[rawMergedData$X5b %in% c('No'),'X5b'] = 0
+    rawMergedData[rawMergedData$X5b %in% c('Friends', 'N/A', ''),'X5b'] = NA
+    rawMergedData$X5b <- suppressWarnings(as.numeric(as.character(rawMergedData$X5b)))
 
     #Finally filter out any of the above we don't want,
     mergedData <- rawMergedData[!isSkip & !isVeto & !isInvalidShift,]
@@ -141,19 +144,20 @@ filterData <- function(inputCSVFile='data/MergedData_DecomNov18.csv', outputCSVF
     
     nFinalEntries = nrow(mergedData)
     print(paste('Total number of output entries:', printValFrac(nFinalEntries, nEntries)))
-    print(paste(' # non-fatal Invalid entries for X1: ', printValFrac(nrow(mergedData[mergedData$X1 == 0,]), nFinalEntries)))
-    print(paste(' # non-fatal Invalid entries for X2a: ', printValFrac(nrow(mergedData[mergedData$X2a == 0,]), nFinalEntries)))
+    print(paste(' # non-fatal Invalid entries for X1: ', printValFrac(nrow(mergedData[is.na(mergedData$X1),]), nFinalEntries)))
+    print(paste(' # non-fatal Invalid entries for X2a: ', printValFrac(nrow(mergedData[is.na(mergedData$X2a),]), nFinalEntries)))
     print(paste(' # non-fatal Invalid entries for X2b: ', printValFrac(nrow(mergedData[mergedData$X2b == '',]), nFinalEntries)))
-    print(paste(' # non-fatal Invalid entries for X3: ', printValFrac(nrow(mergedData[mergedData$X3 == 0,]), nFinalEntries)))
-    print(paste(' # non-fatal Invalid entries for X4: ', printValFrac(nrow(mergedData[mergedData$X4 == 0,]), nFinalEntries)))
-    print(paste(' # non-fatal Invalid entries for X5a: ', printValFrac(nrow(mergedData[mergedData$X5a == 0,]), nFinalEntries)))
-    print(paste(' # non-fatal Invalid entries for X5b: ', printValFrac(nrow(mergedData[mergedData$X5b == 0,]), nFinalEntries)))
+    print(paste(' # non-fatal Invalid entries for X3: ', printValFrac(nrow(mergedData[is.na(mergedData$X3),]), nFinalEntries)))
+    print(paste(' # non-fatal Invalid entries for X4: ', printValFrac(nrow(mergedData[is.na(mergedData$X4),]), nFinalEntries)))
+    print(paste(' # non-fatal Invalid entries for X5a: ', printValFrac(nrow(mergedData[is.na(mergedData$X5a),]), nFinalEntries)))
+    print(paste(' # non-fatal Invalid entries for X5b: ', printValFrac(nrow(mergedData[is.na(mergedData$X5b),]), nFinalEntries)))
     print(paste(' #non-fatal Invalid entries for X5b (for X5a==1,2): ', printValFrac(nrow(mergedData[(mergedData$X5b == 0) & (mergedData$X5a %in% c(1,2)),]), nrow(mergedData[(mergedData$X5a %in% c(1,2)),]))))
     print("Weights stored into 'weightVeto' to compensate vetos per-shift (1=2-5PM, 2=5-8PM, 3=8-11PM):")
     print(weightVecVetos)
 
     #if not empty, write to CSV file
     if (outputCSVFile != '') {
+        #fwrite(mergedData, outputCSVFile)
         write.csv(mergedData, outputCSVFile)
     }
 
@@ -167,11 +171,14 @@ analyze <- function(inputCSVFile='data/MergedData_DecomNov18.csv') {
 
     # Simple frequency/density distributions with weighted entries
     ## Year, clearly spurious data with year==0; translated in age
-    x11()
+    #x11()
     currentYear <- 17
-    ggplot(mergedData, aes(x=ifelse(X1==-1,-1,ifelse(X1>currentYear,currentYear+100-X1,currentYear-X1)),y=..density..,weight=weightVetos)) + geom_histogram(binwidth=10)
-    # alternative version with fraction within bin rather than density / year as above
-    ggplot(mergedData, aes(x=ifelse(X1==-1,-1,ifelse(X1>currentYear,currentYear+100-X1,currentYear-X1)),weight=weightVetos/nEntries)) + geom_histogram(binwidth=10)
+    mergedData <<- within(mergedData, {
+      Age <- ifelse(X1==-1,-1,ifelse(X1>currentYear,currentYear+100-X1,currentYear-X1))
+    })
+    ggplot() + 
+        geom_histogram(binwidth=10, fill='red', alpha=0.5, data=mergedData, aes(x=Age,weight=1./nEntries)) +
+        geom_histogram(binwidth=10, alpha=0.5,fill='blue', data=mergedData, aes(x=Age,weight=weightVetos/sum(weightVetos)))
     
     ## Location
 
