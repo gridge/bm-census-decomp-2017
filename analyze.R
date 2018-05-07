@@ -113,17 +113,22 @@ filterData <- function(inputCSVFile='data/MergedData_DecomNov18.csv', outputCSVF
     rawMergedData$X2b <- as.factor(rawMergedData$X2b)        
 
     #Correct X3,4
-    rawMergedData$X3 <- suppressWarnings(as.numeric(as.character(rawMergedData$X3)))
-    rawMergedData$X4 <- suppressWarnings(as.numeric(as.character(rawMergedData$X4)))
-    
+    rawMergedData$X3 <- as.character(rawMergedData$X3)
+    rawMergedData[(rawMergedData$X3 %in% c('', '.')), 'X3'] = '<NA>'
+    rawMergedData$X3 <- factor(rawMergedData$X3, exclude = NULL)
+    rawMergedData$X4 <- as.character(rawMergedData$X4)
+    rawMergedData[(rawMergedData$X4 %in% c('', '.')), 'X4'] = '<NA>'
+    rawMergedData$X4 <- factor(rawMergedData$X4, exclude = NULL)
 
     #Correct X5a
-    spuriousX5a12 <- (rawMergedData[,'X5a'] == 12 & !is.na(rawMergedData[,'X5a']))
-    rawMergedData[spuriousX5a12, 'X5a'] = 1
-    spuriousX5a23 <- (rawMergedData[,'X5a'] == 23 & !is.na(rawMergedData[,'X5a']))
-    rawMergedData[spuriousX5a23, 'X5a'] = 3
-    rawMergedData[rawMergedData$X5a == 5, 'X5a'] = 1
-    rawMergedData$X5a <- suppressWarnings(as.numeric(as.character(rawMergedData$X5a)))
+    rawMergedData$X5a <- as.character(rawMergedData$X5a)
+    spuriousX5a12 <- (rawMergedData[,'X5a'] == '12' & !is.na(rawMergedData[,'X5a']))
+    rawMergedData[spuriousX5a12, 'X5a'] = '1'
+    spuriousX5a23 <- (rawMergedData[,'X5a'] == '23' & !is.na(rawMergedData[,'X5a']))
+    rawMergedData[spuriousX5a23, 'X5a'] = '3'
+    rawMergedData[rawMergedData$X5a == '5', 'X5a'] = '1'
+    rawMergedData[(rawMergedData$X5a %in% c('', '.')), 'X5a'] = '<NA>'
+    rawMergedData$X5a <- factor(rawMergedData$X5a, exclude = NULL)
 
     #Correct X5b, based on answers to X5a
     rawMergedData[rawMergedData$X5b %in% c('No'),'X5b'] = 0
@@ -146,11 +151,11 @@ filterData <- function(inputCSVFile='data/MergedData_DecomNov18.csv', outputCSVF
     nFinalEntries = nrow(mergedData)
     print(paste('Total number of output entries:', printValFrac(nFinalEntries, nEntries)))
     print(paste(' # non-fatal Invalid entries for X1: ', printValFrac(nrow(mergedData[is.na(mergedData$X1),]), nFinalEntries)))
-    print(paste(' # non-fatal Invalid entries for X2a: ', printValFrac(nrow(mergedData[is.na(mergedData$X2a),]), nFinalEntries)))
+    print(paste(' # non-fatal Invalid entries for X2a: ', printValFrac(nrow(mergedData[mergedData$X2a == '<NA>',]), nFinalEntries)))
     print(paste(' # non-fatal Invalid entries for X2b: ', printValFrac(nrow(mergedData[mergedData$X2b == '',]), nFinalEntries)))
-    print(paste(' # non-fatal Invalid entries for X3: ', printValFrac(nrow(mergedData[is.na(mergedData$X3),]), nFinalEntries)))
-    print(paste(' # non-fatal Invalid entries for X4: ', printValFrac(nrow(mergedData[is.na(mergedData$X4),]), nFinalEntries)))
-    print(paste(' # non-fatal Invalid entries for X5a: ', printValFrac(nrow(mergedData[is.na(mergedData$X5a),]), nFinalEntries)))
+    print(paste(' # non-fatal Invalid entries for X3: ', printValFrac(nrow(mergedData[mergedData$X3 == '<NA>',]), nFinalEntries)))
+    print(paste(' # non-fatal Invalid entries for X4: ', printValFrac(nrow(mergedData[mergedData$X4 == '<NA>',]), nFinalEntries)))
+    print(paste(' # non-fatal Invalid entries for X5a: ', printValFrac(nrow(mergedData[mergedData$X5a == '<NA>',]), nFinalEntries)))
     print(paste(' # non-fatal Invalid entries for X5b: ', printValFrac(nrow(mergedData[is.na(mergedData$X5b),]), nFinalEntries)))
     print(paste(' #non-fatal Invalid entries for X5b (for X5a==1,2): ', printValFrac(nrow(mergedData[(mergedData$X5b == 0) & (mergedData$X5a %in% c(1,2)),]), nrow(mergedData[(mergedData$X5a %in% c(1,2)),]))))
     print("Weights stored into 'weightVeto' to compensate vetos per-shift (1=2-5PM, 2=5-8PM, 3=8-11PM):")
@@ -165,12 +170,14 @@ filterData <- function(inputCSVFile='data/MergedData_DecomNov18.csv', outputCSVF
     return(mergedData)
 }
 
-analyze <- function(inputCSVFile='data/MergedData_DecomNov18.csv') {
+analyze <- function(inputCSVFile='data/MergedData_DecomNov18.csv',savePlots = FALSE) {
     #Filter data first
     mergedData <<- filterData(inputCSVFile, '', FALSE)
     nEntries <<- nrow(mergedData)
 
+    ##################
     #Common plot style
+    ##################
     colorScheme = c("#EA008B","#CC308D","#AE608E","#909090")
     themeSetting <- theme(panel.grid.major = element_blank(),
                           panel.grid.minor.y = element_line(color="#666464", size = .1),
@@ -183,7 +190,9 @@ analyze <- function(inputCSVFile='data/MergedData_DecomNov18.csv') {
     colorSetting <- scale_color_manual(values=colorscheme)
     fillSetting <- scale_fill_manual(values=colorscheme)
     
+    ##################
     # Example plot to show effect of weightVetos
+    ##################
     #x11()
     plotYearWeight <- ggplot() + themeSetting + 
       geom_bar(fill='red', alpha=0.5, data=mergedData, aes(x=Age)) +
@@ -198,8 +207,11 @@ analyze <- function(inputCSVFile='data/MergedData_DecomNov18.csv') {
     #geom_errorbar(aes(x=Age, weight=weightVetos, y=..count.., ymin=..count.. - 5, ymax=..count.. + 5))
     #geom_histogram(binwidth=10, fill='red', alpha=0.5, data=mergedData, aes(x=Age,weight=1./nEntries)) +
     #geom_histogram(binwidth=10, alpha=0.5,fill='blue', data=mergedData, aes(x=Age,weight=weightVetos/sum(weightVetos)))
+    if (savePlots) ggsave("plots/YearWeight.png")
     
+    ##################
     # Simple frequency/density distributions with weighted entries
+    ##################
     #x11()
     summAge <- summary(mergedData[mergedData$Age >= 0,'Age'])
     plotYear <- ggplot() + themeSetting + 
@@ -209,6 +221,7 @@ analyze <- function(inputCSVFile='data/MergedData_DecomNov18.csv') {
         annotate('text',x=45,y=5,label='(only valid entries)',size=3)
       #geom_errorbar(aes(x=Age, weight=weightVetos, y=..count.., ymin=..count.. - 5, ymax=..count.. + 5))
       #geom_histogram(binwidth=10, alpha=0.5,fill='blue', data=mergedData, aes(x=Age,weight=weightVetos/sum(weightVetos)))
+    if (savePlots) ggsave("plots/Year.png")
     
     ## Location
     plotResidenceSumm <- ggplot(data=mergedData,mapping = aes(x=X2a,weight=weightVetos/sum(weightVetos))) + themeSetting + 
@@ -219,7 +232,8 @@ analyze <- function(inputCSVFile='data/MergedData_DecomNov18.csv') {
       theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
       coord_flip() +
       geom_text(stat='count', aes(label=scales::percent(..count..)), hjust=1.0, vjust=0.2)
-
+    if (savePlots) ggsave("plots/ResidenceSumm.png")
+    
     summResidence <- count(df=mergedData,vars=c('X2b'),wt_var = c('weightVetos/sum(weightVetos)'))
     summResidence <- summResidence[order(summResidence$freq,decreasing = TRUE),]
     summResidence$X2b <- factor(summResidence$X2b, levels=summResidence$X2b,exclude=NULL)
@@ -231,15 +245,73 @@ analyze <- function(inputCSVFile='data/MergedData_DecomNov18.csv') {
       scale_y_continuous(labels=scales::percent) +
       theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
     #TODO: add "other" bin to sum up the rest
+    if (savePlots) ggsave("plots/Residence.png")
   
+    ## Gender
+    plotGender <- ggplot(data=mergedData,mapping = aes(x=X3,weight=weightVetos/sum(weightVetos))) + themeSetting + 
+      geom_bar(fill=colorScheme[1]) +
+      labs(title='Gender',x='',y='Precentage') +
+      scale_x_discrete(breaks = c(1:3,"<NA>"), labels=c("Female", "Male", "Both/Neither/Fluid", "N/A")) +
+      scale_y_continuous(labels=scales::percent,limits=c(NA,0.50)) +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
+      geom_text(stat='count', aes(label=scales::percent(..count..)), hjust=0.5, vjust=-0.5)
+    if (savePlots) ggsave("plots/Gender.png")
+    
+    ## Attendance Decom
+    plotAttendanceDecom <- ggplot(data=mergedData,mapping = aes(x=X4,weight=weightVetos/sum(weightVetos))) + themeSetting + 
+      geom_bar(fill=colorScheme[1]) +
+      labs(title='Attendance previous Decompression SF',x='',y='Precentage') +
+      scale_x_discrete(breaks = c(1:2,"<NA>"), labels=c("Yes", "No", "N/A")) +
+      #scale_y_continuous(labels=scales::percent,limits=c(NA,0.55)) +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
+      geom_text(stat='count', aes(label=scales::percent(..count..)), hjust=0.5, vjust=-0.5)
+    if (savePlots) ggsave("plots/AttendanceDecom.png")
+    
+    ## Attendance BM
+    plotAttendanceBM <- ggplot(data=mergedData,mapping = aes(x=X5a,weight=weightVetos/sum(weightVetos))) + themeSetting + 
+      geom_bar(fill=colorScheme[1]) +
+      labs(title='Attendance Burning Man main event',x='',y='Precentage') +
+      scale_x_discrete(breaks = c(1:3,"<NA>"), labels=c("Yes\n(incl. 2017)", "Yes\n(but not 2017)", "No","N/A")) +
+      #scale_y_continuous(labels=scales::percent,limits=c(NA,0.55)) +
+      #theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
+      geom_text(stat='count', aes(label=scales::percent(..count..)), hjust=0.5, vjust=-0.5)
+    if (savePlots) ggsave("plots/AttendanceBM.png")
+    
+    plotBMYears <- ggplot() + themeSetting + 
+      geom_bar(fill=colorScheme[1], data=mergedData, aes(x=X5b,weight=100*weightVetos/sum(weightVetos))) +  
+      labs(title='Number of previous burns',x="Count (0 = never)", y="Percentage (%)") +
+    if (savePlots) ggsave("plots/BMYears.png")
+    
+    ##################    
+    # Correlations
+    ##################
+    ## Attendance previous Decom and BM
+    plotCorrAttendance <- ggplot(data=mergedData,mapping = aes(x=X5a,y=X4,weight=weightVetos/sum(weightVetos))) + themeSetting + 
+      geom_bin2d() +
+      stat_bin2d(geom="text",aes(label=scales::percent(..count..))) +
+      labs(title='Attendance Correlation',x='Burning Man',y='Prev. Decompression') +
+      scale_x_discrete(breaks = c(1:3,"<NA>"), labels=c("Yes\n(incl. 2017)", "Yes\n(but not 2017)", "No","N/A")) +
+      scale_y_discrete(breaks = c(1:2,"<NA>"), labels=c("Yes", "No", "N/A")) +
+      #scale_fill_continuous(name = "Percentage (%)") +
+      scale_fill_gradient2(name = "Percentage (%)", low = "white", high = "red") +
+      theme(legend.position = "top")
+    if (savePlots) ggsave("plots/Corr-Attendance.png")    
+  
+    ##################
     #Heat map of location
+    ##################
     #summResidence$location <- geocode(summResidence$X2b)
     
-    ## ...
-
-    # Correlations
-    
-    
     # Draw requested plot
-    plotResidence
+    #plotYearWeight
+    #plotYear
+    #plotResidenceSumm
+    #plotResidence
+    #plotGender
+    #plotAttendanceDecom
+    #plotAttendanceBM
+    plotBMYears
+    #plotCorrAttendance
+    
+    
 }
