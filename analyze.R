@@ -110,6 +110,16 @@ filterData <- function(inputCSVFile='data/MergedData_DecomNov18.csv', outputCSVF
     rawMergedData[rawMergedData$X2b == 'San_Jose', 'X2b'] = 'San Jose'
     rawMergedData[rawMergedData$X2b == 'San_Carlos', 'X2b'] = 'San Carlos'
     rawMergedData[rawMergedData$X2b == 'San_Rafael', 'X2b'] = 'San Rafael'
+    rawMergedData[rawMergedData$X2b == "on the road between Miami + SF; Standing Rock Reservation, SD", 'X2b'] = 'N/A'
+    rawMergedData[rawMergedData$X2b == 'n/c', 'X2b'] = 'N/A'
+    rawMergedData[rawMergedData$X2b == 'all_over', 'X2b'] = 'N/A'
+    rawMergedData[rawMergedData$X2b == 'NYC', 'X2b'] = 'New York'
+    rawMergedData[rawMergedData$X2b == 'Vae_Dubai', 'X2b'] = 'Dubai'
+    rawMergedData[rawMergedData$X2b == 'WashingtonNW', 'X2b'] = 'Washington, NW'
+    rawMergedData[rawMergedData$X2b == 'Philly', 'X2b'] = 'Philadelphia, PA'
+    rawMergedData[!is.na(rawMergedData$X2a) & (rawMergedData$X2a == 2), 'X2b'] = 
+      paste0(rawMergedData[!is.na(rawMergedData$X2a) & (rawMergedData$X2a == 2), 'X2b'], ', CA')
+    rawMergedData[rawMergedData$X2b == ', CA', 'X2b'] = 'N/A, CA'
     rawMergedData$X2b <- as.factor(rawMergedData$X2b)        
 
     #Correct X3,4
@@ -300,8 +310,33 @@ analyze <- function(inputCSVFile='data/MergedData_DecomNov18.csv',savePlots = FA
     ##################
     #Heat map of location
     ##################
-    #summResidence$location <- geocode(summResidence$X2b)
-    
+    listAllLocations <- levels(summResidence$X2b)
+    #Use cached file, if need to re-generate, see instructions below (but needs manual editing too!)
+    locAlllocations <- read.csv('locations.csv')
+    #locAlllocations <- geocode(listAllLocations)
+    #locAlllocations$place <- listAllLocations
+    summResidence$lon <- locAlllocations[match(summResidence$X2b,locAlllocations$place), 'lon']
+    summResidence$lat <- locAlllocations[match(summResidence$X2b,locAlllocations$place), 'lat']
+    mergedData$lon <- locAlllocations[match(mergedData$X2b,locAlllocations$place), 'lon']
+    mergedData$lat <- locAlllocations[match(mergedData$X2b,locAlllocations$place), 'lat']
+    ca_map <- get_map(location = "San Francisco, CA, USA", maptype = "roadmap", zoom = 6, source = "google")
+    heatMapCA <- ggmap(ca_map,extent = 'device') +
+      #geom_point(aes(x=lon,y=lat),color="red",alpha=0.5,size=2,data=summResidence)
+      geom_density2d(data=summResidence, aes(x=lon,y=lat),size=0.3) +
+      stat_density2d(data=summResidence, aes(x=lon,y=lat,fill=..level..,alpha=..level..),size=0.01,
+          bins=16, geom="polygon")+
+      scale_fill_gradient(low = "green", high = "red") + 
+      scale_alpha(range = c(0, 0.3), guide = FALSE)
+    if (savePlots) ggsave("plots/Corr-HeatMapCA.png")    
+    ca_map <- get_map(location = "San Francisco, CA, USA", maptype = "roadmap", zoom = 10, source = "google")
+    heatMapSF <- ggmap(ca_map,extent = 'device') +
+      geom_point(aes(x=lon,y=lat),color="red",alpha=0.5,size=2,data=mergedData)
+      #geom_density2d(data=mergedData, aes(x=lon,y=lat),size=0.3) +
+      #stat_density2d(data=mergedData, aes(x=lon,y=lat,fill=..level..,alpha=..level..),size=0.01,
+      #               bins=16, geom="polygon")+
+      #scale_fill_gradient(low = "green", high = "red") + 
+      #scale_alpha(range = c(0, 0.3), guide = FALSE)
+    if (savePlots) ggsave("plots/Corr-HeatMapSF.png")    
     # Draw requested plot
     #plotYearWeight
     #plotYear
@@ -310,8 +345,10 @@ analyze <- function(inputCSVFile='data/MergedData_DecomNov18.csv',savePlots = FA
     #plotGender
     #plotAttendanceDecom
     #plotAttendanceBM
-    plotBMYears
+    #plotBMYears
     #plotCorrAttendance
+    #heatMapCA
+    heatMapSF
     
     
 }
