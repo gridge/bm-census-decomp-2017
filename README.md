@@ -1,5 +1,5 @@
 # Analysis of Burning Man Census Decompression data.
-Author: Gridge & Picky, 2018
+Author: Gridge, Picky, Murrs; 2018
 
 analyse.R provides the needed routines.
 
